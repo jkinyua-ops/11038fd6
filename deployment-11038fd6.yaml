@@ -1,0 +1,400 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kingsinns-dining-config-11038fd6
+  namespace: default
+data:
+  # Environment variables for all services
+  ASPNETCORE_ENVIRONMENT: "Development"
+  ASPNETCORE_URLS: "http://+:80"
+  
+  # Database connection strings
+  DefaultConnection: "Data Source=62.171.156.247;Initial Catalog=11038fd6kingsinns;User ID=sa;Password=123@Teams;TrustServerCertificate=true;"
+  
+  # Service URLs using new code-server format
+  IdentitySettings__Authority: "http://11038fd6-kingsinns-ids.deeplyblue.space/"
+  IdentitySettings__TokenEndpoint: "http://11038fd6-kingsinns-ids.deeplyblue.space/connect/token"
+  IdentitySettings__UserInformationEndpoint: "http://11038fd6-kingsinns-ids.deeplyblue.space/connect/userinfo"
+  IdentitySettings__AuthorizationEndpoint: "http://11038fd6-kingsinns-ids.deeplyblue.space/connect/authorize"
+  IdentitySettings__MetadataAddress: "http://11038fd6-kingsinns-ids.deeplyblue.space/.well-known/openid-configuration"
+  IdentitySettings__SelfUrl: "http://11038fd6-kingsinns-dining-web.deeplyblue.space/"
+  IdentitySettings__ApiUrl: "http://11038fd6-kingsinns-dining-host.deeplyblue.space/"
+  
+  # API Settings
+  ApiSettings__BaseUrl: "http://11038fd6-kingsinns-dining-host.deeplyblue.space/"
+  
+  # CORS Origins
+  CorsOrigins: "http://11038fd6-kingsinns-dining-web.deeplyblue.space,http://11038fd6-kingsinns-ids.deeplyblue.space"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kingsinns-dining-startup-scripts-11038fd6
+  namespace: default
+data:
+  startup.sh: |
+    #!/bin/bash
+    
+    # Create command queue directory structure
+    sudo mkdir -p /home/coder/workspace/command-queue
+    sudo mkdir -p /home/coder/workspace/command-queue/startup
+    sudo mkdir -p /home/coder/workspace/command-queue/migration
+    sudo mkdir -p /home/coder/workspace/command-queue/build
+    sudo mkdir -p /home/coder/workspace/command-queue/logs
+    
+    echo "Starting KingsInns Dining project terminal sessions..."
+    
+    # Wait for workspace to be ready
+    sleep 10
+    
+    # Start migration setup first
+    sudo screen -dmS "migration-setup" bash -c "/startup/migration-setup.sh; exec bash"
+    sleep 5
+    
+    # Start each project in separate screen sessions
+    sudo screen -dmS "kingsinns-dining-host" bash -c "/startup/startup-kingsinns-dining-host.sh; exec bash"
+    sleep 3
+    sudo screen -dmS "kingsinns-dining-web" bash -c "/startup/startup-kingsinns-dining-web.sh; exec bash"
+    sleep 3
+    sudo screen -dmS "kingsinns-ids" bash -c "/startup/startup-kingsinns-ids.sh; exec bash"
+    sleep 3
+    
+    # Start command monitor
+    sudo nohup /home/coder/workspace/command-monitor.sh > /home/coder/workspace/command-queue/logs/monitor.log 2>&1 &
+    
+    echo "All project terminal sessions started successfully"
+    echo "Access URLs:"
+    echo "- Code Server: http://11038fd6-code.deeplyblue.space"
+    echo "- Dining Web UI: http://11038fd6-kingsinns-dining-web.deeplyblue.space"
+    echo "- Dining API: http://11038fd6-kingsinns-dining-host.deeplyblue.space"
+    echo "- Identity Server: http://11038fd6-kingsinns-ids.deeplyblue.space"
+
+  migration-setup.sh: |
+    #!/bin/bash
+    cd /home/coder/workspace/code-space
+    
+    echo "=== Running Database Migrations for KingsInns Dining ==="
+    echo "Database: 11038fd6kingsinns"
+    echo ""
+    
+    # Install EF Core tools if not present
+    echo "Installing Entity Framework Core tools..."
+    dotnet tool install --global dotnet-ef --version 8.0.0 || true
+    export PATH="$PATH:/home/coder/.dotnet/tools"
+    
+    # Run migrations for Domain project (contains DbContext)
+    echo "Running migrations for KingsInns.Dining.Domain..."
+    cd /home/coder/workspace/code-space/KingsInns.Dining.Domain
+    dotnet ef database update --startup-project ../KingsInns.Dining.Host --verbose
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Database migrations completed successfully"
+    else
+        echo "❌ Database migration failed. Check connection string and database server."
+    fi
+    
+    echo ""
+    echo "Migration setup completed. You can run migrations manually with:"
+    echo "cd /home/coder/workspace/code-space/KingsInns.Dining.Domain"
+    echo "dotnet ef database update --startup-project ../KingsInns.Dining.Host"
+
+  startup-kingsinns-dining-host.sh: |
+    #!/bin/bash
+    cd /home/coder/workspace/code-space/KingsInns.Dining.Host
+    
+    echo "=== Starting KingsInns.Dining.Host (API) ==="
+    echo "Project Type: ASP.NET Core Web API"
+    echo "Port: 5001"
+    echo "URL: http://11038fd6-kingsinns-dining-host.deeplyblue.space"
+    echo "Swagger: http://11038fd6-kingsinns-dining-host.deeplyblue.space/swagger"
+    echo ""
+    
+    # Build the project first
+    echo "Building KingsInns.Dining.Host..."
+    dotnet build
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Build successful. Starting API server..."
+        echo ""
+        
+        # Run the application
+        dotnet run --urls "http://0.0.0.0:5001"
+    else
+        echo "❌ Build failed. Please check the errors above."
+        echo "You can run 'dotnet build' manually to see detailed errors."
+        echo ""
+        echo "Common issues:"
+        echo "- Check database connection string"
+        echo "- Ensure all NuGet packages are restored"
+        echo "- Verify project references"
+    fi
+
+  startup-kingsinns-dining-web.sh: |
+    #!/bin/bash
+    cd /home/coder/workspace/code-space/KingsInns.Dining.Web
+    
+    echo "=== Starting KingsInns.Dining.Web (Blazor UI) ==="
+    echo "Project Type: Blazor Server Application"
+    echo "Port: 3000"
+    echo "URL: http://11038fd6-kingsinns-dining-web.deeplyblue.space"
+    echo ""
+    
+    # Build the project first
+    echo "Building KingsInns.Dining.Web..."
+    dotnet build
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Build successful. Starting Blazor application..."
+        echo ""
+        
+        # Run the application
+        dotnet run --urls "http://0.0.0.0:3000"
+    else
+        echo "❌ Build failed. Please check the errors above."
+        echo "You can run 'dotnet build' manually to see detailed errors."
+        echo ""
+        echo "Common issues:"
+        echo "- Check API service configuration"
+        echo "- Verify Identity Server settings"
+        echo "- Ensure all dependencies are available"
+    fi
+
+  startup-kingsinns-ids.sh: |
+    #!/bin/bash
+    cd /home/coder/workspace/code-space/KingsInns.IDS
+    
+    echo "=== Starting KingsInns.IDS (Identity Server) ==="
+    echo "Project Type: Duende Identity Server"
+    echo "Port: 5000"
+    echo "URL: http://11038fd6-kingsinns-ids.deeplyblue.space"
+    echo "Discovery: http://11038fd6-kingsinns-ids.deeplyblue.space/.well-known/openid-configuration"
+    echo ""
+    
+    # Build the project first
+    echo "Building KingsInns.IDS..."
+    dotnet build
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Build successful. Starting Identity Server..."
+        echo ""
+        
+        # Run the application
+        dotnet run --urls "http://0.0.0.0:5000"
+    else
+        echo "❌ Build failed. Please check the errors above."
+        echo "You can run 'dotnet build' manually to see detailed errors."
+        echo ""
+        echo "Common issues:"
+        echo "- Check database connection for Identity tables"
+        echo "- Verify certificate configuration"
+        echo "- Ensure client configurations are correct"
+    fi
+
+  command-monitor.sh: |
+    #!/bin/bash
+    
+    # Command queue monitor for remote execution
+    QUEUE_DIR="/home/coder/workspace/command-queue"
+    
+    echo "Starting command queue monitor..."
+    
+    while true; do
+        # Check for startup commands
+        if [ -f "$QUEUE_DIR/startup/execute" ]; then
+            echo "Executing startup command..."
+            bash "$QUEUE_DIR/startup/execute" > "$QUEUE_DIR/logs/startup.log" 2>&1
+            mv "$QUEUE_DIR/startup/execute" "$QUEUE_DIR/startup/executed-$(date +%s)"
+        fi
+        
+        # Check for migration commands
+        if [ -f "$QUEUE_DIR/migration/execute" ]; then
+            echo "Executing migration command..."
+            bash "$QUEUE_DIR/migration/execute" > "$QUEUE_DIR/logs/migration.log" 2>&1
+            mv "$QUEUE_DIR/migration/execute" "$QUEUE_DIR/migration/executed-$(date +%s)"
+        fi
+        
+        # Check for build commands
+        if [ -f "$QUEUE_DIR/build/execute" ]; then
+            echo "Executing build command..."
+            bash "$QUEUE_DIR/build/execute" > "$QUEUE_DIR/logs/build.log" 2>&1
+            mv "$QUEUE_DIR/build/execute" "$QUEUE_DIR/build/executed-$(date +%s)"
+        fi
+        
+        sleep 5
+    done
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kingsinns-dining-codeserver-11038fd6
+  namespace: default
+  labels:
+    app: kingsinns-dining-codeserver
+    project-id: "11038fd6"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kingsinns-dining-codeserver
+      project-id: "11038fd6"
+  template:
+    metadata:
+      labels:
+        app: kingsinns-dining-codeserver
+        project-id: "11038fd6"
+    spec:
+      containers:
+      - name: codeserver
+        image: jeremykinyua/code-server:dotnet8
+        ports:
+        - containerPort: 8080
+          name: codeserver
+        - containerPort: 3000
+          name: blazor-ui
+        - containerPort: 5000
+          name: identity
+        - containerPort: 5001
+          name: api
+        env:
+        - name: PASSWORD
+          value: "codeserver123"
+        - name: SUDO_PASSWORD
+          value: "codeserver123"
+        envFrom:
+        - configMapRef:
+            name: kingsinns-dining-config-11038fd6
+        volumeMounts:
+        - name: workspace
+          mountPath: /home/coder/workspace/code-space
+        - name: startup-scripts
+          mountPath: /startup
+        - name: command-monitor
+          mountPath: /home/coder/workspace/command-monitor.sh
+          subPath: command-monitor.sh
+        command: ["/bin/bash"]
+        args: 
+        - -c
+        - |
+          # Make scripts executable
+          chmod +x /startup/*.sh
+          chmod +x /home/coder/workspace/command-monitor.sh
+          
+          # Start code-server in background
+          /usr/bin/entrypoint.sh --bind-addr 0.0.0.0:8080 /home/coder/workspace/code-space &
+          
+          # Wait for code-server to start
+          sleep 15
+          
+          # Execute startup script
+          /startup/startup.sh
+          
+          # Keep container running
+          tail -f /dev/null
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+      volumes:
+      - name: workspace
+        emptyDir:
+          sizeLimit: 10Gi
+      - name: startup-scripts
+        configMap:
+          name: kingsinns-dining-startup-scripts-11038fd6
+          defaultMode: 0755
+      - name: command-monitor
+        configMap:
+          name: kingsinns-dining-startup-scripts-11038fd6
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kingsinns-dining-codeserver-service-11038fd6
+  namespace: default
+spec:
+  selector:
+    app: kingsinns-dining-codeserver
+    project-id: "11038fd6"
+  ports:
+  - name: codeserver
+    port: 8080
+    targetPort: 8080
+  - name: blazor-ui
+    port: 3000
+    targetPort: 3000
+  - name: identity
+    port: 5000
+    targetPort: 5000
+  - name: api
+    port: 5001
+    targetPort: 5001
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kingsinns-dining-ingress-11038fd6
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "kingsinns-dining-codeserver-service-11038fd6"
+spec:
+  rules:
+  # Code-server UI
+  - host: 11038fd6-code.deeplyblue.space
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kingsinns-dining-codeserver-service-11038fd6
+            port:
+              number: 8080
+  
+  # Blazor Web UI
+  - host: 11038fd6-kingsinns-dining-web.deeplyblue.space
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kingsinns-dining-codeserver-service-11038fd6
+            port:
+              number: 3000
+  
+  # Identity Server
+  - host: 11038fd6-kingsinns-ids.deeplyblue.space
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kingsinns-dining-codeserver-service-11038fd6
+            port:
+              number: 5000
+  
+  # API Host
+  - host: 11038fd6-kingsinns-dining-host.deeplyblue.space
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kingsinns-dining-codeserver-service-11038fd6
+            port:
+              number: 5001
