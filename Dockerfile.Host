@@ -1,0 +1,25 @@
+#modified by joylo.ai
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["KingsInns.Dining.Host/KingsInns.Dining.Host.csproj", "KingsInns.Dining.Host/"]
+COPY ["KingsInns.Dining.Core/KingsInns.Dining.Core.csproj", "KingsInns.Dining.Core/"]
+COPY ["KingsInns.Dining.Domain/KingsInns.Dining.Domain.csproj", "KingsInns.Dining.Domain/"]
+COPY ["KingsInns.Dining.Contracts/KingsInns.Dining.Contracts.csproj", "KingsInns.Dining.Contracts/"]
+COPY ["KingsInns.EmailService/KingsInns.EmailService.csproj", "KingsInns.EmailService/"]
+RUN dotnet restore "KingsInns.Dining.Host/KingsInns.Dining.Host.csproj"
+COPY . .
+WORKDIR "/src/KingsInns.Dining.Host"
+RUN dotnet build "KingsInns.Dining.Host.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "KingsInns.Dining.Host.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "KingsInns.Dining.Host.dll"]
